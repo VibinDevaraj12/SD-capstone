@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#071426">
+  <meta name="description" content="A local engineering dashboard for analyzing N-channel MOSFET rectifier efficiency and reverse current.">
+  <title>ReFluxGuard Efficiency Analyzer</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><span>RF</span><i></i></div>
+      <div><p class="eyebrow">SEMICONDUCTOR DEVICE CAPSTONE</p><h1>ReFluxGuard <span>Efficiency Analyzer</span></h1></div>
+    </div>
+    <div class="live-status"><span class="status-dot"></span> LOCAL ANALYSIS <span class="status-divider">·</span> NO DATA LEAVES THIS BROWSER</div>
+  </header>
+
+  <main class="page-shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow accent">ENGINEERING WORKBENCH <span class="eyebrow-line"></span></p>
+        <h2>MOSFET Rectifier Efficiency<br><span>and Reverse-Current Analysis</span></h2>
+        <p class="hero-copy">Analyze measured DC performance, compare rectifier configurations, and keep an auditable local experiment log.</p>
+      </div>
+      <div class="hero-chip"><span class="chip-icon">⌁</span><div><strong>Measurement-first</strong><small>Use your own lab data</small></div></div>
+    </section>
+
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+
+    <section class="section-block" aria-labelledby="entry-heading">
+      <div class="section-heading">
+        <div><p class="eyebrow">01 / MEASUREMENT</p><h2 id="entry-heading">Experiment entry</h2></div>
+        <span class="section-note"><span class="required-star">*</span> Required fields</span>
+      </div>
+      <div class="entry-layout">
+        <form id="experiment-form" class="panel form-panel" novalidate>
+          <div class="form-grid">
+            <label class="field"><span>Experiment ID <b>*</b></span><input id="experiment-id" name="experiment_id" type="text" maxlength="80" placeholder="e.g. RG-LOAD-01" required><small>Unique identifier; an existing ID can be deliberately replaced.</small></label>
+            <label class="field"><span>Date <b>*</b></span><input id="date" name="date" type="date" required></label>
+            <label class="field field-wide"><span>Rectifier configuration <b>*</b></span>
+              <select id="configuration" name="configuration" required>
+                <option value="ReFluxGuard">ReFluxGuard</option>
+                <option value="Conventional MOSFET Rectifier">Conventional MOSFET Rectifier</option>
+              </select>
+            </label>
+            <div class="field-divider">DC ELECTRICAL MEASUREMENTS</div>
+            <label class="field"><span>Input voltage <b>*</b></span><div class="input-unit"><input id="vin" name="vin_v" type="number" step="any" min="0" inputmode="decimal" placeholder="12.0" required><em>V</em></div></label>
+            <label class="field"><span>Input current <b>*</b></span><div class="input-unit"><input id="iin" name="iin_a" type="number" step="any" min="0" inputmode="decimal" placeholder="0.50" required><em>A</em></div></label>
+            <label class="field"><span>Output voltage <b>*</b></span><div class="input-unit"><input id="vout" name="vout_v" type="number" step="any" min="0" inputmode="decimal" placeholder="11.0" required><em>V</em></div></label>
+            <label class="field"><span>Output current <b>*</b></span><div class="input-unit"><input id="iout" name="iout_a" type="number" step="any" min="0" inputmode="decimal" placeholder="0.45" required><em>A</em></div></label>
+            <label class="field"><span>Reverse current magnitude <b>*</b></span><div class="input-unit"><input id="reverse-current" name="reverse_current_ma" type="number" step="any" min="0" inputmode="decimal" placeholder="8.0" required><em>mA</em></div><small>Enter a non-negative magnitude.</small></label>
+            <div class="field-divider">TEST CONDITIONS <span>OPTIONAL</span></div>
+            <label class="field"><span>Switching frequency</span><div class="input-unit"><input id="frequency" name="switching_frequency_hz" type="number" step="any" min="0" inputmode="decimal" placeholder="100000"><em>Hz</em></div></label>
+            <label class="field"><span>Load resistance</span><div class="input-unit"><input id="load-resistance" name="load_resistance_ohm" type="number" step="any" min="0" inputmode="decimal" placeholder="24.4"><em>Ω</em></div></label>
+            <label class="field"><span>Ambient temperature</span><div class="input-unit"><input id="temperature" name="ambient_temperature_c" type="number" step="any" inputmode="decimal" placeholder="25"><em>°C</em></div></label>
+            <label class="field field-wide"><span>Experiment notes</span><textarea id="notes" name="notes" rows="3" maxlength="2000" placeholder="Instrument setup, uncertainty, observed waveform behavior…"></textarea></label>
+          </div>
+          <div id="form-error" class="form-error" role="alert" hidden></div>
+          <div class="form-actions">
+            <button type="button" class="button button-primary" id="calculate-button"><span>↗</span> Calculate Efficiency</button>
+            <button type="button" class="button button-secondary" id="save-button">Save Experiment</button>
+            <button type="reset" class="button button-quiet" id="reset-button">Reset Form</button>
+          </div>
+        </form>
+
+        <aside class="panel equation-panel">
+          <div class="panel-heading"><span class="panel-icon">ƒx</span><div><p class="eyebrow">MODEL</p><h3>Simplified DC calculation</h3></div></div>
+          <div class="equation-list">
+            <div><span>Input power</span><code>P<sub>in</sub> = V<sub>in</sub> × I<sub>in</sub></code></div>
+            <div><span>Output power</span><code>P<sub>out</sub> = V<sub>out</sub> × I<sub>out</sub></code></div>
+            <div><span>Power loss</span><code>P<sub>loss</sub> = P<sub>in</sub> − P<sub>out</sub></code></div>
+            <div><span>Efficiency</span><code>η = (P<sub>out</sub> / P<sub>in</sub>) × 100%</code></div>
+            <div><span>Voltage drop</span><code>ΔV = V<sub>in</sub> − V<sub>out</sub></code></div>
+            <div><span>Reverse current</span><code>I<sub>rev</sub>(A) = I<sub>rev</sub>(mA) / 1000</code></div>
+          </div>
+          <div class="info-callout"><span>ⓘ</span><p>For AC input, measure <strong>real power</strong>. Highly rippled rectifier waveforms may require averaging instantaneous power, <em>v(t) × i(t)</em>, rather than multiplying average voltage and current.</p></div>
+          <p class="small-muted">A result outside the passive-rectifier range indicates a measurement/model inconsistency to investigate—not, by itself, a verified hardware fault.</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section-block" id="results-section" aria-labelledby="results-heading">
+      <div class="section-heading">
+        <div><p class="eyebrow">02 / CALCULATED OUTPUT</p><h2 id="results-heading">Measurement results</h2></div>
+        <span id="result-context" class="section-note">Calculate a measurement to view results</span>
+      </div>
+      <div id="result-warning" class="warning-banner" role="status" hidden></div>
+      <div class="results-grid">
+        <article class="result-card"><div class="result-label"><span class="metric-icon blue">Pᵢ</span><span>INPUT POWER</span></div><div class="result-value" id="result-pin">— <small>W</small></div><div class="result-foot">V<sub>in</sub> × I<sub>in</sub></div></article>
+        <article class="result-card"><div class="result-label"><span class="metric-icon cyan">Pₒ</span><span>OUTPUT POWER</span></div><div class="result-value" id="result-pout">— <small>W</small></div><div class="result-foot">V<sub>out</sub> × I<sub>out</sub></div></article>
+        <article class="result-card efficiency-card"><div class="result-label"><span class="metric-icon green">η</span><span>CALCULATED EFFICIENCY</span></div><div class="result-value" id="result-efficiency">— <small>%</small></div><div class="gauge-track"><div id="efficiency-gauge" class="gauge-fill"></div></div><div class="result-foot">Simplified DC power ratio</div></article>
+        <article class="result-card"><div class="result-label"><span class="metric-icon amber">ΔP</span><span>POWER LOSS</span></div><div class="result-value" id="result-loss">— <small>W</small></div><div class="result-foot">P<sub>in</sub> − P<sub>out</sub></div></article>
+        <article class="result-card"><div class="result-label"><span class="metric-icon purple">ΔV</span><span>VOLTAGE DROP</span></div><div class="result-value" id="result-drop">— <small>V</small></div><div class="result-foot">V<sub>in</sub> − V<sub>out</sub></div></article>
+        <article class="result-card"><div class="result-label"><span class="metric-icon red">Iᵣ</span><span>REVERSE CURRENT</span></div><div class="result-value" id="result-reverse">— <small>mA</small></div><div class="result-foot"><span id="result-reverse-amps">— A</span> converted from mA</div></article>
+      </div>
+    </section>
+
+    <section class="section-block" aria-labelledby="comparison-heading">
+      <div class="section-heading">
+        <div><p class="eyebrow">03 / CONFIGURATION ANALYSIS</p><h2 id="comparison-heading">Compare configurations</h2></div>
+        <button id="compare-button" class="button button-secondary"><span>⇄</span> Compare Configurations</button>
+      </div>
+      <div class="panel comparison-panel">
+        <div id="comparison-empty" class="empty-state"><span class="empty-symbol">⇄</span><div><strong>Comparison needs two configurations</strong><p>Save at least one ReFluxGuard record and one conventional rectifier record, then compare.</p></div></div>
+        <div id="comparison-content" hidden>
+          <div class="comparison-pair"><div><span class="config-dot reflux-dot"></span><strong>ReFluxGuard</strong><small id="comparison-rg-id">—</small></div><span class="vs">VS</span><div><span class="config-dot baseline-dot"></span><strong>Conventional MOSFET Rectifier</strong><small id="comparison-base-id">—</small></div></div>
+          <div class="comparison-metrics">
+            <div><span>Efficiency improvement</span><strong id="delta-efficiency">—</strong><small>percentage points</small></div>
+            <div><span>Relative efficiency improvement</span><strong id="relative-efficiency">—</strong><small>relative to conventional</small></div>
+            <div><span>Reverse-current reduction</span><strong id="reverse-reduction">—</strong><small>relative to conventional</small></div>
+            <div><span>Power-loss reduction</span><strong id="loss-reduction">—</strong><small>relative to conventional</small></div>
+          </div>
+        </div>
+        <div class="info-callout comparison-note"><span>ⓘ</span><p>Comparisons are meaningful only when input conditions, load, switching frequency, temperature, measurement method, and other relevant test conditions are sufficiently comparable. Negative improvement is retained and means the ReFluxGuard result was lower for that metric.</p></div>
+      </div>
+    </section>
+
+    <section class="section-block" aria-labelledby="charts-heading">
+      <div class="section-heading"><div><p class="eyebrow">04 / VISUAL ANALYSIS</p><h2 id="charts-heading">Performance charts</h2></div><span class="section-note">Based only on saved records</span></div>
+      <div class="charts-grid">
+        <article class="panel chart-panel"><div class="chart-heading"><div><h3>Efficiency comparison</h3><span>Efficiency (%)</span></div><span class="chart-index">01</span></div><div class="chart-wrap"><canvas id="efficiency-chart" aria-label="Efficiency comparison chart"></canvas><p class="chart-empty" hidden>No saved records to chart.</p></div></article>
+        <article class="panel chart-panel"><div class="chart-heading"><div><h3>Input vs output power</h3><span>Power (W)</span></div><span class="chart-index">02</span></div><div class="chart-wrap"><canvas id="power-chart" aria-label="Input power versus output power chart"></canvas><p class="chart-empty" hidden>No saved records to chart.</p></div></article>
+        <article class="panel chart-panel"><div class="chart-heading"><div><h3>Power-loss comparison</h3><span>Power loss (W)</span></div><span class="chart-index">03</span></div><div class="chart-wrap"><canvas id="loss-chart" aria-label="Power loss comparison chart"></canvas><p class="chart-empty" hidden>No saved records to chart.</p></div></article>
+        <article class="panel chart-panel"><div class="chart-heading"><div><h3>Reverse-current comparison</h3><span>Reverse current (mA)</span></div><span class="chart-index">04</span></div><div class="chart-wrap"><canvas id="reverse-chart" aria-label="Reverse current comparison chart"></canvas><p class="chart-empty" hidden>No saved records to chart.</p></div></article>
+        <article class="panel chart-panel chart-wide"><div class="chart-heading"><div><h3>Efficiency versus load</h3><span>Load resistance (Ω) · Efficiency (%)</span></div><span class="chart-index">05</span></div><div class="chart-wrap load-chart-wrap"><canvas id="load-chart" aria-label="Efficiency versus load resistance chart"></canvas><p class="chart-empty" hidden>Add at least two records with load resistance values to show this chart.</p></div></article>
+      </div>
+    </section>
+
+    <section class="section-block" aria-labelledby="records-heading">
+      <div class="section-heading records-heading">
+        <div><p class="eyebrow">05 / LOCAL RECORDS</p><h2 id="records-heading">Experiment log <span id="record-count" class="count-badge">0</span></h2></div>
+        <div class="record-actions">
+          <button id="load-sample-button" class="button button-secondary">Load Sample Dataset</button>
+          <button id="load-example-button" class="button button-quiet">Load Example Experiment</button>
+          <button id="import-csv-button" class="button button-quiet">Import CSV</button>
+          <button id="export-filtered-button" class="button button-quiet">Export Filtered CSV</button>
+          <button id="export-button" class="button button-quiet">Export All CSV</button>
+          <button id="clear-button" class="button button-danger">Clear All Data</button>
+          <input id="dataset-file" type="file" accept=".csv,text/csv" hidden>
+        </div>
+      </div>
+      <div class="panel table-panel">
+        <div class="table-toolbar">
+          <label class="search-box"><span>⌕</span><input id="table-search" type="search" placeholder="Search ID, configuration, notes…" aria-label="Search experiment records"></label>
+          <span id="filtered-count" class="table-count">0 records</span>
+        </div>
+        <div class="table-scroll">
+          <table id="records-table">
+            <thead><tr>
+              <th><button data-sort="experiment_id">Experiment ID <span>↕</span></button></th>
+              <th><button data-sort="date">Date <span>↕</span></button></th>
+              <th><button data-sort="configuration">Configuration <span>↕</span></button></th>
+              <th><button data-sort="pin">Input Power <span>↕</span></button></th>
+              <th><button data-sort="pout">Output Power <span>↕</span></button></th>
+              <th><button data-sort="efficiency">Efficiency <span>↕</span></button></th>
+              <th><button data-sort="loss">Power Loss <span>↕</span></button></th>
+              <th><button data-sort="reverse_current_ma">Reverse Current <span>↕</span></button></th>
+              <th><button data-sort="load_resistance_ohm">Load Resistance <span>↕</span></button></th>
+              <th>Notes</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="records-body"></tbody>
+          </table>
+          <div id="table-empty" class="table-empty"><span>▤</span><strong>No experiment records yet</strong><p>Enter a measurement or load the simulated demonstration dataset.</p></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer"><div><span class="footer-mark">RF</span><p><strong>ReFluxGuard Efficiency Analyzer</strong><br>Student engineering capstone project · N-Channel MOSFET Rectifier</p></div><p class="footer-disclaimer">Analysis is based on user-entered measurements. Demonstration data is simulated and is not evidence of prototype performance.</p></footer>
+</body>
+</html>
